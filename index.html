@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Single Player Poker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #053B22; /* Dark green felt color */
+            background-image: radial-gradient(circle, #064f2e 10%, #053B22 70%);
+            color: #f0f0f0;
+        }
+        .poker-table {
+            border: 10px solid #5a3a22;
+            box-shadow: 0 0 20px rgba(0,0,0,0.7) inset, 0 0 15px rgba(0,0,0,0.5);
+        }
+        .card {
+            width: 80px;
+            height: 112px;
+            border-radius: 8px;
+            background-color: white;
+            color: black;
+            border: 1px solid #aaa;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: relative;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: 'Playfair Display', serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.3s ease;
+        }
+        .card.red { color: #B22222; }
+        .card.black { color: #2C2C2C; }
+        .card-back {
+            background: linear-gradient(135deg, #4169E1 25%, transparent 25%) -40px 0,
+                        linear-gradient(225deg, #4169E1 25%, transparent 25%) -40px 0,
+                        linear-gradient(315deg, #4169E1 25%, transparent 25%),
+                        linear-gradient(45deg, #4169E1 25%, transparent 25%);
+            background-size: 80px 80px;
+            background-color: #2c5282;
+        }
+        .card .rank-top { position: absolute; top: 5px; left: 8px; font-size: 16px; }
+        .card .suit { font-size: 32px; }
+        .card .rank-bottom { position: absolute; bottom: 5px; right: 8px; font-size: 16px; transform: rotate(180deg); }
+
+        .chip-stack {
+            background-color: #c2a53c;
+            color: #2d3748;
+            border: 2px solid #a08221;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .dealer-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #e2e8f0;
+            color: #2d3748;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid #b9c5d6;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .poker-chip {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 3px rgba(0,0,0,0.4);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            text-shadow: 1px 1px 1px #000;
+            flex-shrink: 0;
+        }
+        .poker-chip::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
+            border-radius: 50%;
+            border: 1px dashed rgba(255,255,255,0.5);
+        }
+        .poker-chip.red { background-color: #c53030; border-color: #f5c6cb; }
+        .poker-chip.blue { background-color: #3182ce; border-color: #bee3f8; }
+        .poker-chip.green { background-color: #38a169; border-color: #c6f6d5; }
+        .poker-chip.black { background-color: #2d3748; border-color: #e2e8f0; }
+        
+        #chat-container {
+            background-color: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            border: 2px solid #5a3a22;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        #chat-log {
+            scrollbar-width: thin;
+            scrollbar-color: #c2a53c #064f2e;
+        }
+        #chat-log::-webkit-scrollbar { width: 8px; }
+        #chat-log::-webkit-scrollbar-track { background: #064f2e; }
+        #chat-log::-webkit-scrollbar-thumb {
+            background-color: #c2a53c;
+            border-radius: 4px;
+            border: 2px solid #064f2e;
+        }
+        .chat-message {
+            font-size: 14px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .chat-system { color: #f7fafc; background-color: rgba(45, 55, 72, 0.5); }
+        .chat-player { color: #c6f6d5; }
+        .chat-dealer { color: #fbb6b6; }
+        .chat-win { color: #f6e05e; font-weight: bold; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-7xl flex items-start space-x-4">
+        <div class="poker-table flex-grow w-3/4 bg-[#064f2e] rounded-full p-8 space-y-8">
+            <!-- Pot and Info -->
+            <div class="text-center space-y-2">
+                <h1 class="text-3xl font-bold text-yellow-300 tracking-wider" style="font-family: 'Playfair Display', serif;">Texas Hold'em</h1>
+                <div id="message-area" class="text-lg text-white font-semibold h-7 transition-opacity duration-300">Welcome to the table!</div>
+                <div class="flex justify-center items-center space-x-4">
+                    <span class="text-xl font-bold">Pot:</span>
+                    <span id="pot-amount" class="chip-stack px-4 py-1 rounded-full text-xl font-bold">0</span>
+                </div>
+                <div id="pot-chips-visual" class="flex justify-center items-center mt-2 h-8">
+                    <!-- Visual chips will be added here by JS -->
+                </div>
+            </div>
+
+            <!-- Dealer's Area -->
+            <div class="relative min-h-[120px]">
+                <div class="absolute inset-x-0 top-0 flex flex-col items-center space-y-2">
+                    <span class="font-semibold text-lg">Dealer</span>
+                    <div id="dealer-hand" class="flex space-x-3"></div>
+                    <div class="flex items-center space-x-2">
+                        <div id="dealer-chips" class="chip-stack px-3 py-1 rounded-full font-semibold">Chips: 1000</div>
+                        <div id="dealer-button-marker" class="dealer-button hidden">D</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Community Cards -->
+            <div class="min-h-[120px] flex flex-col items-center justify-center space-y-2">
+                <span class="font-semibold text-lg">Community Cards</span>
+                <div id="community-cards" class="flex space-x-3 h-[112px]"></div>
+            </div>
+
+            <!-- Player's Area -->
+            <div class="relative min-h-[120px]">
+                <div class="absolute inset-x-0 bottom-0 flex flex-col items-center space-y-2">
+                    <div class="flex items-center space-x-2">
+                        <div id="player-chips" class="chip-stack px-3 py-1 rounded-full font-semibold">Chips: 1000</div>
+                        <div id="player-button-marker" class="dealer-button hidden">D</div>
+                    </div>
+                    <div id="player-hand" class="flex space-x-3"></div>
+                    <span class="font-semibold text-lg">Player</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div id="controls" class="flex justify-center items-center space-x-4 pt-4 border-t-2 border-green-800 border-opacity-50">
+                <button id="deal-button" class="btn bg-yellow-500 hover:bg-yellow-400 text-gray-800 font-bold py-2 px-6 rounded-lg shadow-md">Deal Hand</button>
+                <div id="action-buttons" class="hidden space-x-4">
+                    <button id="fold-button" class="btn bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-6 rounded-lg shadow-md">Fold</button>
+                    <button id="check-button" class="btn bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg shadow-md">Check</button>
+                    <button id="bet-button" class="btn bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg shadow-md">Bet</button>
+                    <button id="all-in-button" class="btn bg-orange-500 hover:bg-orange-400 text-white font-bold py-2 px-6 rounded-lg shadow-md">All In</button>
+                </div>
+                <input type="number" id="bet-amount" value="20" class="hidden bg-gray-200 text-gray-800 text-center w-24 rounded-lg p-2 shadow-inner">
+            </div>
+        </div>
+        
+        <!-- Chat Box -->
+        <div id="chat-container" class="w-1/4 flex flex-col h-[700px]">
+            <h2 class="text-lg font-bold text-yellow-300 p-2 text-center border-b-2 border-yellow-800 flex-shrink-0">Game Log</h2>
+            <div id="chat-log" class="flex-grow overflow-y-auto p-2 space-y-1 min-h-0">
+                <!-- Messages appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-2xl text-center border-4 border-yellow-500">
+            <h2 id="game-over-title" class="text-3xl font-bold text-yellow-300 mb-4" style="font-family: 'Playfair Display', serif;">Game Over</h2>
+            <p id="game-over-message" class="text-white text-lg mb-6">You've run out of chips!</p>
+            <div class="space-x-4">
+                <button id="new-game-button" class="btn bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-lg">New Game</button>
+                <button id="quit-button" class="btn bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-lg">Quit</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Designed with love by Chris and Emma
+        
+        // ============================================================================
+        // DOM Elements
+        // ============================================================================
+        const dealButton = document.getElementById('deal-button');
+        const actionButtons = document.getElementById('action-buttons');
+        const foldButton = document.getElementById('fold-button');
+        const checkButton = document.getElementById('check-button');
+        const betButton = document.getElementById('bet-button');
+        const allInButton = document.getElementById('all-in-button');
+        const betAmountInput = document.getElementById('bet-amount');
+        const messageArea = document.getElementById('message-area');
+        
+        const playerHandDiv = document.getElementById('player-hand');
+        const dealerHandDiv = document.getElementById('dealer-hand');
+        const communityCardsDiv = document.getElementById('community-cards');
+        
+        const playerChipsDiv = document.getElementById('player-chips');
+        const dealerChipsDiv = document.getElementById('dealer-chips');
+        const potAmountDiv = document.getElementById('pot-amount');
+        const potChipsVisualDiv = document.getElementById('pot-chips-visual');
+
+        const playerButtonMarker = document.getElementById('player-button-marker');
+        const dealerButtonMarker = document.getElementById('dealer-button-marker');
+        const chatLog = document.getElementById('chat-log');
+
+        const gameOverModal = document.getElementById('game-over-modal');
+        const gameOverMessage = document.getElementById('game-over-message');
+        const newGameButton = document.getElementById('new-game-button');
+        const quitButton = document.getElementById('quit-button');
+
+
+        // ============================================================================
+        // Game Classes (Card, Deck)
+        // ============================================================================
+        class Card {
+          constructor(suit, rank) {
+            this.suit = suit;
+            this.rank = rank;
+          }
+        
+          toString() {
+            return `${this.rank} of ${this.suit}`;
+          }
+
+          getHTML() {
+              const suitSymbols = { 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣', 'Spades': '♠' };
+              const colorClass = (this.suit === 'Hearts' || this.suit === 'Diamonds') ? 'red' : 'black';
+              
+              const cardDiv = document.createElement('div');
+              cardDiv.classList.add('card', colorClass);
+              
+              const rankTop = document.createElement('span');
+              rankTop.classList.add('rank-top');
+              rankTop.textContent = this.rank;
+
+              const suit = document.createElement('span');
+              suit.classList.add('suit');
+              suit.textContent = suitSymbols[this.suit];
+
+              const rankBottom = document.createElement('span');
+              rankBottom.classList.add('rank-bottom');
+              rankBottom.textContent = this.rank;
+
+              cardDiv.appendChild(rankTop);
+              cardDiv.appendChild(suit);
+              cardDiv.appendChild(rankBottom);
+
+              return cardDiv;
+          }
+        }
+        
+        class Deck {
+          constructor() {
+            this.cards = [];
+            this.createDeck();
+          }
+        
+          createDeck() {
+            const suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades'];
+            const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        
+            for (const suit of suits) {
+              for (const rank of ranks) {
+                this.cards.push(new Card(suit, rank));
+              }
+            }
+          }
+        
+          shuffle() {
+            for (let i = this.cards.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
+            }
+          }
+        
+          deal() {
+            return this.cards.pop();
+          }
+        }
+        
+        // ============================================================================
+        // Game Logic
+        // ============================================================================
+        
+        let player = { name: "Player", chips: 1000, hand: [], isAllIn: false };
+        let dealer = { name: "Dealer", chips: 1000, hand: [], isAllIn: false };
+        let pot = 0;
+        let communityCards = [];
+        let deck;
+        let gamePhase = 'pre-deal'; // pre-deal, pre-flop, flop, turn, river, showdown
+        let dealerPosition = 'player';
+        let isAllInShowdown = false;
+
+        function logToChat(message, type = 'system') {
+            const p = document.createElement('p');
+            p.textContent = message;
+            p.className = `chat-message chat-${type}`;
+            chatLog.appendChild(p);
+            chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll
+        }
+
+        function renderPotChips(amount) {
+            potChipsVisualDiv.innerHTML = '';
+            if (amount === 0) return;
+
+            const chipValues = { black: 100, green: 25, blue: 10, red: 5 };
+            let remainingAmount = amount;
+            const maxChipsToShow = 20;
+            const chipStack = [];
+
+            for (const [color, value] of Object.entries(chipValues)) {
+                const count = Math.floor(remainingAmount / value);
+                for (let i = 0; i < count; i++) {
+                    if(chipStack.length >= maxChipsToShow) break;
+                    chipStack.push(`<div class="poker-chip ${color}" style="margin-left: ${chipStack.length > 0 ? '-20px' : '0'};"></div>`);
+                }
+                if(chipStack.length >= maxChipsToShow) break;
+                remainingAmount %= value;
+            }
+            potChipsVisualDiv.innerHTML = chipStack.join('');
+        }
+
+        function updateUI() {
+            playerHandDiv.innerHTML = '';
+            dealerHandDiv.innerHTML = '';
+            communityCardsDiv.innerHTML = '';
+
+            player.hand.forEach(card => playerHandDiv.appendChild(card.getHTML()));
+
+            dealer.hand.forEach(card => {
+                if (gamePhase === 'showdown' || isAllInShowdown) {
+                     dealerHandDiv.appendChild(card.getHTML());
+                } else {
+                    const cardBack = document.createElement('div');
+                    cardBack.className = 'card card-back';
+                    dealerHandDiv.appendChild(cardBack);
+                }
+            });
+
+            communityCards.forEach(card => communityCardsDiv.appendChild(card.getHTML()));
+            
+            playerChipsDiv.textContent = `Chips: ${player.chips}`;
+            dealerChipsDiv.textContent = `Chips: ${dealer.chips}`;
+            potAmountDiv.textContent = pot;
+
+            renderPotChips(pot);
+
+            dealButton.classList.toggle('hidden', gamePhase !== 'pre-deal');
+            const showActions = gamePhase !== 'pre-deal' && !player.isAllIn && !dealer.isAllIn;
+            actionButtons.classList.toggle('hidden', !showActions);
+            betAmountInput.classList.toggle('hidden', !showActions);
+        }
+
+        function showMessage(msg, duration = 3000) {
+            messageArea.textContent = msg;
+            messageArea.style.opacity = '1';
+            if(duration) {
+                setTimeout(() => {
+                    if(messageArea.textContent === msg) {
+                        messageArea.style.opacity = '0';
+                    }
+                }, duration);
+            }
+        }
+
+        function showGameOver(message) {
+            gameOverMessage.textContent = message;
+            gameOverModal.classList.remove('hidden');
+            dealButton.disabled = true;
+            actionButtons.classList.add('hidden');
+            betAmountInput.classList.add('hidden');
+        }
+
+        function resetGame() {
+            player.chips = 1000;
+            dealer.chips = 1000;
+            pot = 0;
+            communityCards = [];
+            player.hand = [];
+            dealer.hand = [];
+            player.isAllIn = false;
+            dealer.isAllIn = false;
+            gamePhase = 'pre-deal';
+
+            gameOverModal.classList.add('hidden');
+            dealButton.disabled = false;
+            
+            chatLog.innerHTML = ''; // Clear the chat log
+            logToChat("Welcome back! A new game begins.");
+            showMessage('Starting a new game!');
+            updateUI();
+        }
+
+        function startNewHand() {
+            if (player.chips <= 0) {
+                showGameOver("Game Over! You're out of chips.");
+                logToChat("Game Over! You're out of chips.", 'win');
+                return;
+            }
+            if (dealer.chips <= 0) {
+                showGameOver("Congratulations! You've won all the chips!");
+                logToChat("Congratulations! You've won all the chips!", 'win');
+                return;
+            }
+
+            deck = new Deck();
+            deck.shuffle();
+            
+            player.hand = [];
+            dealer.hand = [];
+            player.isAllIn = false;
+            dealer.isAllIn = false;
+            communityCards = [];
+            pot = 0;
+            isAllInShowdown = false;
+            
+            dealerPosition = dealerPosition === 'player' ? 'dealer' : 'player';
+
+            const smallBlind = 10;
+            const bigBlind = 20;
+            let sbPlayer, bbPlayer;
+
+            if (dealerPosition === 'player') {
+                sbPlayer = player;
+                bbPlayer = dealer;
+                playerButtonMarker.classList.remove('hidden');
+                dealerButtonMarker.classList.add('hidden');
+            } else {
+                sbPlayer = dealer;
+                bbPlayer = player;
+                dealerButtonMarker.classList.remove('hidden');
+                playerButtonMarker.classList.add('hidden');
+            }
+
+            sbPlayer.chips -= smallBlind;
+            bbPlayer.chips -= bigBlind;
+            pot = smallBlind + bigBlind;
+
+            logToChat(`--- NEW HAND ---`);
+            logToChat(`${dealerPosition.charAt(0).toUpperCase() + dealerPosition.slice(1)} has the button.`);
+            logToChat(`${sbPlayer.name} posts small blind: ${smallBlind}`, sbPlayer.name.toLowerCase());
+            logToChat(`${bbPlayer.name} posts big blind: ${bigBlind}`, bbPlayer.name.toLowerCase());
+            logToChat(`Initial Pot: ${pot}`);
+            
+            showMessage('Blinds are in. Dealing cards...');
+
+            player.hand.push(deck.deal(), deck.deal());
+            dealer.hand.push(deck.deal(), deck.deal());
+
+            gamePhase = 'pre-flop';
+            updateUI();
+        }
+
+        function runoutBoard() {
+            actionButtons.classList.add('hidden');
+            betAmountInput.classList.add('hidden');
+            showMessage('A player is all-in. Revealing hands!', 2000);
+            logToChat('A player is all-in. Revealing hands!');
+            
+            isAllInShowdown = true;
+            updateUI(); // Reveal hands immediately
+
+            const dealSequence = [];
+            if (gamePhase === 'pre-flop') { dealSequence.push('flop', 'turn', 'river'); }
+            else if (gamePhase === 'flop') { dealSequence.push('turn', 'river'); }
+            else if (gamePhase === 'turn') { dealSequence.push('river'); }
+
+            const dealNext = () => {
+                if (dealSequence.length === 0) {
+                    setTimeout(determineWinner, 2000);
+                    return;
+                }
+                const phase = dealSequence.shift();
+                setTimeout(() => {
+                    gamePhase = phase;
+                    const msg = `Dealing the ${phase}...`;
+                    showMessage(msg, 1900);
+                    logToChat(msg);
+                    deck.deal(); // Burn one card
+                    if (phase === 'flop') {
+                        communityCards.push(deck.deal(), deck.deal(), deck.deal());
+                    } else {
+                        communityCards.push(deck.deal());
+                    }
+                    updateUI();
+                    dealNext();
+                }, 2000);
+            };
+            
+            dealNext();
+        }
+
+        function nextPhase() {
+            if (player.isAllIn || dealer.isAllIn) {
+                runoutBoard();
+                return;
+            }
+
+            setTimeout(() => {
+                let msg = '';
+                switch(gamePhase) {
+                    case 'pre-flop':
+                        gamePhase = 'flop';
+                        deck.deal();
+                        communityCards.push(deck.deal(), deck.deal(), deck.deal());
+                        msg = 'Dealing the flop...';
+                        break;
+                    case 'flop':
+                        gamePhase = 'turn';
+                        deck.deal();
+                        communityCards.push(deck.deal());
+                        msg = 'Dealing the turn...';
+                        break;
+                    case 'turn':
+                        gamePhase = 'river';
+                        deck.deal();
+                        communityCards.push(deck.deal());
+                        msg = 'Dealing the river...';
+                        break;
+                    case 'river':
+                        gamePhase = 'showdown';
+                        determineWinner();
+                        return;
+                }
+                 showMessage(msg);
+                 logToChat(msg);
+                 updateUI();
+            }, 500);
+        }
+        
+        function playerAction(action, value = 0) {
+            if (action === 'fold') {
+                dealer.chips += pot;
+                const msg = 'Player folds. Dealer wins the pot.';
+                showMessage(msg);
+                logToChat('Player folds.', 'player');
+                logToChat('Dealer wins the pot.', 'win');
+                gamePhase = 'pre-deal';
+                updateUI();
+                return;
+            }
+
+            if (action === 'check') {
+                showMessage('Player checks. AI checks.');
+                logToChat('Player checks.', 'player');
+                logToChat('Dealer checks.', 'dealer');
+                nextPhase();
+            }
+
+            if (action === 'bet') {
+                 const betValue = value;
+                 if (betValue > 0 && player.chips >= betValue) {
+                     player.chips -= betValue;
+                     if (player.chips === 0) player.isAllIn = true;
+                     pot += betValue;
+                     const msg = player.isAllIn ? 'Player is ALL-IN!' : `Player bets ${betValue}.`;
+                     showMessage(msg);
+                     logToChat(`${msg} Pot is now ${pot}.`, 'player');
+                     updateUI();
+
+                     setTimeout(() => {
+                        const callAmount = Math.min(betValue, dealer.chips);
+                        dealer.chips -= callAmount;
+                        if (dealer.chips === 0) dealer.isAllIn = true;
+                        pot += callAmount;
+                        
+                        if (callAmount < betValue) {
+                            const refund = betValue - callAmount;
+                            player.chips += refund;
+                            if (player.isAllIn) player.isAllIn = false;
+                            pot -= refund; // Pot was over-incremented
+                            const aiMsg = `Dealer is all-in for ${callAmount}!`;
+                            const refundMsg = `You get ${refund} back.`;
+                            showMessage(`${aiMsg} ${refundMsg}`);
+                            logToChat(`${aiMsg} Pot is now ${pot}.`, 'dealer');
+                            logToChat(refundMsg, 'system');
+                        } else {
+                            const aiMsg = `Dealer calls ${callAmount}.`;
+                            showMessage(aiMsg);
+                            logToChat(`${aiMsg} Pot is now ${pot}.`, 'dealer');
+                        }
+                        nextPhase();
+                     }, 1000);
+                 } else if (betValue > player.chips) {
+                     showMessage("You don't have enough chips for that bet.");
+                 } else {
+                     showMessage("Invalid bet amount.");
+                 }
+            }
+        }
+        
+        // ============================================================================
+        // Hand Evaluation Logic
+        // ============================================================================
+        const cardValues = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+
+        function getCombinations(array, k) {
+            const result = [];
+            function comb(temp, start) {
+                if (temp.length === k) {
+                    result.push([...temp]);
+                    return;
+                }
+                for (let i = start; i < array.length; i++) {
+                    temp.push(array[i]);
+                    comb(temp, i + 1);
+                    temp.pop();
+                }
+            }
+            comb([], 0);
+            return result;
+        }
+
+        function evaluate5CardHand(hand) {
+            const sortedHand = [...hand].sort((a, b) => cardValues[b.rank] - cardValues[a.rank]);
+            const ranks = sortedHand.map(c => c.rank);
+            const values = ranks.map(r => cardValues[r]);
+            const suits = sortedHand.map(c => c.suit);
+
+            const isFlush = suits.every(s => s === suits[0]);
+            
+            const uniqueValues = [...new Set(values)];
+            const isAceLowStraight = uniqueValues.length === 5 && uniqueValues[0] === 14 && uniqueValues[1] === 5 && uniqueValues[4] === 2;
+            const straightValues = isAceLowStraight ? [5, 4, 3, 2, 1] : values;
+            
+            let isStraight = true;
+            for(let i=0; i < straightValues.length - 1; i++){
+                if(straightValues[i] !== straightValues[i+1] + 1){
+                    isStraight = false;
+                    break;
+                }
+            }
+            if(isAceLowStraight) isStraight = true;
+            
+            if (isStraight && isFlush) {
+                if (values[0] === 14 && values[1] === 13) return { rank: 9, name: "Royal Flush", kickers: [], hand: sortedHand };
+                return { rank: 8, name: "Straight Flush", kickers: [straightValues[0]], hand: sortedHand };
+            }
+
+            const rankCounts = ranks.reduce((acc, rank) => { acc[rank] = (acc[rank] || 0) + 1; return acc; }, {});
+            const counts = Object.values(rankCounts).sort((a, b) => b - a);
+
+            if (counts[0] === 4) {
+                const quadRank = Object.keys(rankCounts).find(r => rankCounts[r] === 4);
+                const kicker = Object.keys(rankCounts).find(r => rankCounts[r] === 1);
+                return { rank: 7, name: "Four of a Kind", kickers: [cardValues[quadRank], cardValues[kicker]], hand: sortedHand };
+            }
+            
+            if (counts[0] === 3 && counts[1] === 2) {
+                const threeRank = Object.keys(rankCounts).find(r => rankCounts[r] === 3);
+                const pairRank = Object.keys(rankCounts).find(r => rankCounts[r] === 2);
+                return { rank: 6, name: "Full House", kickers: [cardValues[threeRank], cardValues[pairRank]], hand: sortedHand };
+            }
+
+            if (isFlush) {
+                return { rank: 5, name: "Flush", kickers: values, hand: sortedHand };
+            }
+            
+            if (isStraight) {
+                 return { rank: 4, name: "Straight", kickers: [straightValues[0]], hand: sortedHand };
+            }
+
+            if (counts[0] === 3) {
+                const threeRank = Object.keys(rankCounts).find(r => rankCounts[r] === 3);
+                const kickers = sortedHand.filter(c => c.rank !== threeRank).map(c => cardValues[c.rank]);
+                return { rank: 3, name: "Three of a Kind", kickers: [cardValues[threeRank], ...kickers], hand: sortedHand };
+            }
+
+            if (counts[0] === 2 && counts[1] === 2) {
+                const pairRanks = Object.keys(rankCounts).filter(r => rankCounts[r] === 2).sort((a,b)=> cardValues[b] - cardValues[a]);
+                const kicker = Object.keys(rankCounts).find(r => rankCounts[r] === 1);
+                return { rank: 2, name: "Two Pair", kickers: [cardValues[pairRanks[0]], cardValues[pairRanks[1]], cardValues[kicker]], hand: sortedHand };
+            }
+
+            if (counts[0] === 2) {
+                const pairRank = Object.keys(rankCounts).find(r => rankCounts[r] === 2);
+                const kickers = sortedHand.filter(c => c.rank !== pairRank).map(c => cardValues[c.rank]);
+                return { rank: 1, name: "One Pair", kickers: [cardValues[pairRank], ...kickers], hand: sortedHand };
+            }
+
+            return { rank: 0, name: "High Card", kickers: values, hand: sortedHand };
+        }
+
+        function getBestHand(sevenCards) {
+            const combinations = getCombinations(sevenCards, 5);
+            let bestHand = { rank: -1, kickers: [] };
+
+            for (const combo of combinations) {
+                const evaluated = evaluate5CardHand(combo);
+                if (evaluated.rank > bestHand.rank) {
+                    bestHand = evaluated;
+                } else if (evaluated.rank === bestHand.rank) {
+                    for (let i = 0; i < evaluated.kickers.length; i++) {
+                        if (evaluated.kickers[i] > (bestHand.kickers[i] || -1)) {
+                            bestHand = evaluated;
+                            break;
+                        }
+                        if (evaluated.kickers[i] < (bestHand.kickers[i] || -1)) {
+                            break;
+                        }
+                    }
+                }
+            }
+            return bestHand;
+        }
+
+        function determineWinner() {
+            gamePhase = 'showdown';
+            if (!isAllInShowdown) {
+                 const msg = 'Showdown! Revealing cards...';
+                 showMessage(msg, 5000);
+                 logToChat(msg);
+            }
+            updateUI();
+            
+            setTimeout(() => {
+                const playerBestHand = getBestHand([...player.hand, ...communityCards]);
+                const dealerBestHand = getBestHand([...dealer.hand, ...communityCards]);
+
+                logToChat(`Player has: ${playerBestHand.name}`, 'player');
+                logToChat(`Dealer has: ${dealerBestHand.name}`, 'dealer');
+                console.log("Player's best 5-card hand:", playerBestHand.hand.map(c=>c.toString()));
+                console.log("Dealer's best 5-card hand:", dealerBestHand.hand.map(c=>c.toString()));
+
+
+                let winner = null;
+                let resultMessage = '';
+
+                if (playerBestHand.rank > dealerBestHand.rank) {
+                    winner = player;
+                } else if (dealerBestHand.rank > playerBestHand.rank) {
+                    winner = dealer;
+                } else {
+                    for (let i = 0; i < playerBestHand.kickers.length; i++) {
+                        if (playerBestHand.kickers[i] > dealerBestHand.kickers[i]) {
+                            winner = player;
+                            break;
+                        }
+                        if (dealerBestHand.kickers[i] > playerBestHand.kickers[i]) {
+                            winner = dealer;
+                            break;
+                        }
+                    }
+                }
+
+                if (winner) {
+                    winner.chips += pot;
+                    resultMessage = `${winner.name} wins the pot of ${pot} with ${winner === player ? playerBestHand.name : dealerBestHand.name}!`;
+                } else {
+                    player.chips += Math.floor(pot / 2);
+                    dealer.chips += Math.ceil(pot / 2); // Handle odd pots
+                    resultMessage = `Split pot! Both players have ${playerBestHand.name}.`;
+                }
+                
+                showMessage(resultMessage, 6000);
+                logToChat(resultMessage, 'win');
+    
+                setTimeout(() => {
+                    gamePhase = 'pre-deal';
+                    updateUI();
+                }, 6000);
+            }, 1500);
+        }
+
+        // Event Listeners
+        dealButton.addEventListener('click', startNewHand);
+        foldButton.addEventListener('click', () => playerAction('fold'));
+        checkButton.addEventListener('click', () => playerAction('check'));
+        betButton.addEventListener('click', () => {
+            const betValue = parseInt(betAmountInput.value);
+            playerAction('bet', betValue);
+        });
+        allInButton.addEventListener('click', () => {
+            const betValue = player.chips;
+            playerAction('bet', betValue);
+        });
+        newGameButton.addEventListener('click', resetGame);
+        quitButton.addEventListener('click', () => {
+            showGameOver('Thanks for playing!');
+            newGameButton.disabled = true;
+            quitButton.disabled = true;
+            logToChat("Thanks for playing! Refresh to start over.", 'system');
+        });
+
+
+        // Initial UI Render
+        updateUI();
+        logToChat("Welcome to the table! Click 'Deal Hand' to start.");
+
+    </script>
+</body>
+</html>
+
